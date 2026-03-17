@@ -183,6 +183,17 @@
       border-radius: 999px;
       border: 1px solid var(--border);
       color: var(--muted);
+      cursor: pointer;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+      user-select: none;
+    }
+    .pill:hover {
+      border-color: var(--muted);
+    }
+    .pill.active {
+      color: var(--bg);
+      background: var(--fg);
+      border-color: var(--fg);
     }
 
     /* ── Format selector ── */
@@ -443,15 +454,31 @@ json.dumps({'family': family, 'axes': axes, 'instances': instances})
         $('iRange').textContent     = `${min}–${max}`;
         $('iAxes').textContent      = Object.keys(fontMeta.axes).join(', ');
         $('iInstances').textContent = fontMeta.instances;
-        $('weightPills').innerHTML  = weights.map(([w, n]) => `<span class="pill">${w} ${n}</span>`).join('');
+        $('weightPills').innerHTML = weights
+          .map(([w, n]) => `<span class="pill active" data-weight="${w}">${w} ${n}</span>`)
+          .join('');
+        // Attach toggle listeners
+        $('weightPills').querySelectorAll('.pill').forEach(pill => {
+          pill.addEventListener('click', () => {
+            pill.classList.toggle('active');
+            updateGenerateBtn();
+          });
+        });
         $('fontInfo').classList.remove('hidden');
         setStatus(`${weights.length} weights detected — ready`, 'ok', 100);
-        $('generateBtn').disabled = false;
+        updateGenerateBtn();
 
       } catch (err) {
         setStatus('Error: ' + err.message, 'err');
         console.error(err);
       }
+    }
+
+    // ─── Generate button state ───────────────────────────────────────────────
+    function updateGenerateBtn() {
+      const hasFont    = fontMeta !== null;
+      const hasWeights = $('weightPills').querySelectorAll('.pill.active').length > 0;
+      $('generateBtn').disabled = !(hasFont && hasWeights);
     }
 
     // ─── Generate ZIP ────────────────────────────────────────────────────────
@@ -467,11 +494,16 @@ json.dumps({'family': family, 'axes': axes, 'instances': instances})
         return;
       }
 
+      // Get selected weights from active pills
+      const weights = [...$('weightPills').querySelectorAll('.pill.active')]
+        .map(el => [parseInt(el.dataset.weight), WEIGHTS[parseInt(el.dataset.weight)]]);
+      if (!weights.length) {
+        setStatus('Select at least one weight.', 'err');
+        return;
+      }
+
       btn.disabled = true;
       btn.textContent = 'Processing…';
-
-      const { min, max } = fontMeta.axes.wght;
-      const weights    = weightsInRange(min, max);
       const familySlug = (fontMeta.family || 'Font').replace(/\s+/g, '');
       const zip        = new JSZip();
       const total      = weights.length * formats.length;
