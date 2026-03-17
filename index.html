@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Variable Font Splitter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #09090b;
+      --surface:  #18181b;
+      --border:   #27272a;
+      --muted:    #71717a;
+      --fg:       #fafafa;
+      --radius:   8px;
+      --mono:     ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      --sans:     ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.125rem;
+    }
+
+    /* ── Header ── */
+    h1 {
+      font-size: 1.0625rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      position: relative;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .drop-zone:hover,
+    .drop-zone.over {
+      border-color: var(--muted);
+      background: rgb(255 255 255 / 0.02);
+    }
+    .drop-zone.has-file {
+      border-style: solid;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .drop-icon {
+      width: 34px;
+      height: 34px;
+      color: var(--muted);
+      margin: 0 auto 0.875rem;
+    }
+    .drop-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .drop-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    /* ── Status ── */
+    .status-body {
+      padding: 0.875rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .dot.loading { background: #facc15; animation: blink 1s ease-in-out infinite; }
+    .dot.ok      { background: #4ade80; }
+    .dot.err     { background: #f87171; }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+    .status-text {
+      font-size: 0.8125rem;
+    }
+    .progress {
+      height: 2px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--fg);
+      border-radius: 999px;
+      transition: width 0.35s ease;
+      width: 0%;
+    }
+
+    /* ── Font info grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border-top: 1px solid var(--border);
+    }
+    .info-cell {
+      background: var(--surface);
+      padding: 0.75rem 1rem;
+    }
+    .info-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    .info-value {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      font-family: var(--mono);
+    }
+
+    /* ── Weight pills ── */
+    .weights {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+      padding: 0.875rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .pill {
+      font-size: 0.6875rem;
+      font-family: var(--mono);
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    /* ── Button ── */
+    .btn {
+      width: 100%;
+      padding: 0.5625rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: var(--sans);
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+    .btn:focus-visible {
+      outline: 2px solid var(--fg);
+      outline-offset: 2px;
+    }
+    .btn-primary {
+      background: var(--fg);
+      color: var(--bg);
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <div>
+      <h1>Variable Font Splitter</h1>
+      <p class="subtitle">Drop a variable font file to extract individual weight instances as .woff2.</p>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".woff,.woff2,.ttf,.otf" />
+      <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      <p class="drop-label" id="dropLabel">Drop font file here</p>
+      <p class="drop-hint">.woff · .woff2 · .ttf · .otf — variable fonts only</p>
+    </div>
+
+    <div class="card" id="statusCard">
+      <div class="status-body">
+        <div class="status-row">
+          <div class="dot loading" id="dot"></div>
+          <span class="status-text" id="statusText">Loading Python runtime…</span>
+        </div>
+        <div class="progress">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+      </div>
+
+      <div id="fontInfo" class="hidden">
+        <div class="info-grid">
+          <div class="info-cell">
+            <div class="info-label">Family</div>
+            <div class="info-value" id="iFamily">—</div>
+          </div>
+          <div class="info-cell">
+            <div class="info-label">Weight range</div>
+            <div class="info-value" id="iRange">—</div>
+          </div>
+          <div class="info-cell">
+            <div class="info-label">Axes</div>
+            <div class="info-value" id="iAxes">—</div>
+          </div>
+          <div class="info-cell">
+            <div class="info-label">Named instances</div>
+            <div class="info-value" id="iInstances">—</div>
+          </div>
+        </div>
+        <div class="weights" id="weightPills"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="generateBtn" disabled>
+      Generate &amp; Download ZIP
+    </button>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+  <script>
+    // ─── State ───────────────────────────────────────────────────────────────
+    let pyodide    = null;
+    let fontBytes  = null;
+    let fontMeta   = null;
+    let ready      = false;
+
+    const WEIGHTS = {
+      100: 'Thin', 200: 'ExtraLight', 300: 'Light',   400: 'Regular',
+      500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black',
+    };
+
+    // ─── UI helpers ──────────────────────────────────────────────────────────
+    const $  = id => document.getElementById(id);
+
+    function setStatus(text, state = 'loading', pct = null) {
+      $('statusText').textContent = text;
+      $('dot').className = 'dot ' + state;
+      if (pct !== null) $('progressBar').style.width = pct + '%';
+    }
+
+    // ─── Runtime init ────────────────────────────────────────────────────────
+    async function initRuntime() {
+      try {
+        setStatus('Loading Python runtime…', 'loading', 5);
+        pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/' });
+
+        setStatus('Loading fonttools…', 'loading', 40);
+        await pyodide.loadPackage(['fonttools', 'brotli']);
+
+        setStatus('Ready — drop a font to get started', 'ok', 100);
+        ready = true;
+        if (fontBytes) analyzeFont();
+      } catch (err) {
+        setStatus('Failed to load runtime: ' + err.message, 'err');
+        console.error(err);
+      }
+    }
+
+    // ─── Drop zone ───────────────────────────────────────────────────────────
+    const dropZone = $('dropZone');
+
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
+    dropZone.addEventListener('dragend',   ()  => dropZone.classList.remove('over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('over');
+      const file = e.dataTransfer?.files?.[0];
+      if (file) loadFile(file);
+    });
+    $('fileInput').addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) loadFile(file);
+    });
+
+    async function loadFile(file) {
+      $('dropLabel').textContent = file.name;
+      dropZone.classList.add('has-file');
+      fontBytes = new Uint8Array(await file.arrayBuffer());
+      $('fontInfo').classList.add('hidden');
+      $('generateBtn').disabled = true;
+      if (ready) analyzeFont();
+      else setStatus('Loading runtime, please wait…', 'loading');
+    }
+
+    // ─── Analyze font ────────────────────────────────────────────────────────
+    async function analyzeFont() {
+      setStatus('Analyzing font…', 'loading', 10);
+      try {
+        pyodide.globals.set('_fbytes', pyodide.toPy(fontBytes));
+
+        const raw = await pyodide.runPythonAsync(`
+import io, json
+from fontTools.ttLib import TTFont
+
+font   = TTFont(io.BytesIO(bytes(_fbytes)))
+family = ''
+if 'name' in font:
+    for r in font['name'].names:
+        if r.nameID == 1:
+            try: family = r.toUnicode(); break
+            except: pass
+
+axes = {}
+instances = 0
+if 'fvar' in font:
+    for ax in font['fvar'].axes:
+        axes[ax.axisTag] = {
+            'min': ax.minValue, 'default': ax.defaultValue, 'max': ax.maxValue
+        }
+    instances = len(font['fvar'].instances)
+
+json.dumps({'family': family, 'axes': axes, 'instances': instances})
+`);
+
+        fontMeta = JSON.parse(raw);
+
+        if (!fontMeta.axes?.wght) {
+          setStatus('No wght axis found — is this a variable font?', 'err');
+          return;
+        }
+
+        const { min, max } = fontMeta.axes.wght;
+        const weights = weightsInRange(min, max);
+
+        $('iFamily').textContent    = fontMeta.family || '—';
+        $('iRange').textContent     = `${min}–${max}`;
+        $('iAxes').textContent      = Object.keys(fontMeta.axes).join(', ');
+        $('iInstances').textContent = fontMeta.instances;
+        $('weightPills').innerHTML  = weights.map(([w, n]) => `<span class="pill">${w} ${n}</span>`).join('');
+        $('fontInfo').classList.remove('hidden');
+        setStatus(`${weights.length} weights detected — ready`, 'ok', 100);
+        $('generateBtn').disabled = false;
+
+      } catch (err) {
+        setStatus('Error: ' + err.message, 'err');
+        console.error(err);
+      }
+    }
+
+    // ─── Generate ZIP ────────────────────────────────────────────────────────
+    $('generateBtn').addEventListener('click', generateZip);
+
+    async function generateZip() {
+      const btn = $('generateBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing…';
+
+      const { min, max, default: def } = fontMeta.axes.wght;
+      const weights    = weightsInRange(min, max);
+      const familySlug = (fontMeta.family || 'Font').replace(/\s+/g, '');
+      const zip        = new JSZip();
+
+      // Build axes to pin: wght → target, others → default
+      const otherAxes = Object.fromEntries(
+        Object.entries(fontMeta.axes)
+          .filter(([tag]) => tag !== 'wght')
+          .map(([tag, info]) => [tag, info.default])
+      );
+
+      try {
+        for (let i = 0; i < weights.length; i++) {
+          const [w, name] = weights[i];
+          const pct = Math.round(((i + 0.5) / weights.length) * 92);
+          setStatus(`Generating ${name} (${w})…`, 'loading', pct);
+
+          pyodide.globals.set('_fbytes',     pyodide.toPy(fontBytes));
+          pyodide.globals.set('_axes_json',  JSON.stringify({ ...otherAxes, wght: w }));
+
+          const result = await pyodide.runPythonAsync(`
+import io, json
+from fontTools.varLib.instancer import instantiateVariableFont
+from fontTools.ttLib import TTFont
+
+font      = TTFont(io.BytesIO(bytes(_fbytes)))
+axes_dict = json.loads(_axes_json)
+instantiateVariableFont(font, axes_dict, inplace=True, optimize=False)
+
+out = io.BytesIO()
+font.flavor = 'woff2'
+font.save(out)
+out.getvalue()
+`);
+
+          // Python bytes → Uint8Array
+          const bytes = result instanceof Uint8Array ? result : new Uint8Array(result.toJs ? result.toJs() : result);
+          if (result?.destroy) result.destroy();
+
+          zip.file(`${familySlug}-${name}.woff2`, bytes);
+        }
+
+        setStatus('Creating ZIP…', 'loading', 96);
+        const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+
+        const url = URL.createObjectURL(blob);
+        const a   = Object.assign(document.createElement('a'), { href: url, download: `${familySlug}-static.zip` });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        setStatus(`Done — ${weights.length} .woff2 files downloaded`, 'ok', 100);
+
+      } catch (err) {
+        setStatus('Error: ' + err.message, 'err');
+        console.error(err);
+      }
+
+      btn.textContent = 'Generate & Download ZIP';
+      btn.disabled    = false;
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+    function weightsInRange(min, max) {
+      return Object.entries(WEIGHTS)
+        .map(([w, n]) => [parseInt(w), n])
+        .filter(([w]) => w >= min && w <= max);
+    }
+
+    // ─── Boot ─────────────────────────────────────────────────────────────────
+    initRuntime();
+  </script>
+</body>
+</html>
