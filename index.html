@@ -185,6 +185,63 @@
       color: var(--muted);
     }
 
+    /* ── Format selector ── */
+    .formats {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.875rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .formats-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .fmt-check {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.8125rem;
+      font-family: var(--mono);
+      color: var(--fg);
+      cursor: pointer;
+      user-select: none;
+    }
+    .fmt-check input[type="checkbox"] {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .fmt-check input[type="checkbox"]:checked {
+      background: var(--fg);
+      border-color: var(--fg);
+    }
+    .fmt-check input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 1px;
+      width: 5px;
+      height: 8px;
+      border: 1.5px solid var(--bg);
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+    .fmt-check:hover input[type="checkbox"]:not(:checked) {
+      border-color: var(--muted);
+    }
+
     /* ── Button ── */
     .btn {
       width: 100%;
@@ -216,7 +273,7 @@
 
     <div>
       <h1>Variable Font Splitter</h1>
-      <p class="subtitle">Drop a variable font file to extract individual weight instances as .woff2.</p>
+      <p class="subtitle">Drop a variable font file to extract individual weight instances as TTF, WOFF or WOFF2.</p>
     </div>
 
     <div class="drop-zone" id="dropZone">
@@ -259,6 +316,12 @@
           </div>
         </div>
         <div class="weights" id="weightPills"></div>
+        <div class="formats">
+          <span class="formats-label">Format</span>
+          <label class="fmt-check"><input type="checkbox" value="ttf">   TTF</label>
+          <label class="fmt-check"><input type="checkbox" value="woff">  WOFF</label>
+          <label class="fmt-check"><input type="checkbox" value="woff2" checked> WOFF2</label>
+        </div>
       </div>
     </div>
 
@@ -396,31 +459,46 @@ json.dumps({'family': family, 'axes': axes, 'instances': instances})
 
     async function generateZip() {
       const btn = $('generateBtn');
+
+      // Get selected formats
+      const formats = [...document.querySelectorAll('.fmt-check input:checked')].map(el => el.value);
+      if (!formats.length) {
+        setStatus('Select at least one output format.', 'err');
+        return;
+      }
+
       btn.disabled = true;
       btn.textContent = 'Processing…';
 
-      const { min, max, default: def } = fontMeta.axes.wght;
+      const { min, max } = fontMeta.axes.wght;
       const weights    = weightsInRange(min, max);
       const familySlug = (fontMeta.family || 'Font').replace(/\s+/g, '');
       const zip        = new JSZip();
+      const total      = weights.length * formats.length;
+      let   step       = 0;
 
-      // Build axes to pin: wght → target, others → default
+      // Axes to pin: wght → target, others → default
       const otherAxes = Object.fromEntries(
         Object.entries(fontMeta.axes)
           .filter(([tag]) => tag !== 'wght')
           .map(([tag, info]) => [tag, info.default])
       );
 
+      // flavor mapping for fonttools
+      const FLAVOR = { ttf: 'none', woff: 'woff', woff2: 'woff2' };
+
       try {
-        for (let i = 0; i < weights.length; i++) {
-          const [w, name] = weights[i];
-          const pct = Math.round(((i + 0.5) / weights.length) * 92);
-          setStatus(`Generating ${name} (${w})…`, 'loading', pct);
+        for (const [w, name] of weights) {
+          for (const fmt of formats) {
+            const pct = Math.round(((step + 0.5) / total) * 92);
+            setStatus(`Generating ${name} (${w}) · ${fmt.toUpperCase()}…`, 'loading', pct);
+            step++;
 
-          pyodide.globals.set('_fbytes',     pyodide.toPy(fontBytes));
-          pyodide.globals.set('_axes_json',  JSON.stringify({ ...otherAxes, wght: w }));
+            pyodide.globals.set('_fbytes',    pyodide.toPy(fontBytes));
+            pyodide.globals.set('_axes_json', JSON.stringify({ ...otherAxes, wght: w }));
+            pyodide.globals.set('_flavor',    FLAVOR[fmt]);
 
-          const result = await pyodide.runPythonAsync(`
+            const result = await pyodide.runPythonAsync(`
 import io, json
 from fontTools.varLib.instancer import instantiateVariableFont
 from fontTools.ttLib import TTFont
@@ -430,16 +508,16 @@ axes_dict = json.loads(_axes_json)
 instantiateVariableFont(font, axes_dict, inplace=True, optimize=False)
 
 out = io.BytesIO()
-font.flavor = 'woff2'
+font.flavor = None if _flavor == 'none' else _flavor
 font.save(out)
 out.getvalue()
 `);
 
-          // Python bytes → Uint8Array
-          const bytes = result instanceof Uint8Array ? result : new Uint8Array(result.toJs ? result.toJs() : result);
-          if (result?.destroy) result.destroy();
+            const fileBytes = result instanceof Uint8Array ? result : new Uint8Array(result.toJs ? result.toJs() : result);
+            if (result?.destroy) result.destroy();
 
-          zip.file(`${familySlug}-${name}.woff2`, bytes);
+            zip.file(`${familySlug}-${name}.${fmt}`, fileBytes);
+          }
         }
 
         setStatus('Creating ZIP…', 'loading', 96);
@@ -452,7 +530,8 @@ out.getvalue()
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-        setStatus(`Done — ${weights.length} .woff2 files downloaded`, 'ok', 100);
+        const summary = formats.map(f => f.toUpperCase()).join(' + ');
+        setStatus(`Done — ${weights.length} weights × ${formats.length} format${formats.length > 1 ? 's' : ''} (${summary})`, 'ok', 100);
 
       } catch (err) {
         setStatus('Error: ' + err.message, 'err');
